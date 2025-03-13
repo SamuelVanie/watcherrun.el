@@ -1,0 +1,31 @@
+* Project Specifications
+
+** Description
+
+- This is a project that will permits to programmers inside emacs, to call some specific system command or emacs-lisp function at file event.
+- We will call the fact of adding a command for each file notification a watcher(s)
+- We will use the file notification api of emacs to create this whole system
+- Uses only emacs native functionalities so would work on any system not like [[https://github.com/SamuelVanie/entr-runner.el][entr-runner.el]]
+
+  
+** Functionalities
+
+- The user should be able to mark files from dired view and configure a command that will gets executed at file change
+- Before prompting for the command, the user should be able to choose between system command or lisp expression that will get executed
+- System commands should be executed with the async command execution system of emacs, because we don't know if it will needs user interaction
+- The user should be able to list all the "watchers" that he added (maybe a transient menu to manage all of this)
+- He should be able to delete a watcher
+- He should be able to change the commands that gets executed for a particular watcher (stop the current and reexecute on the same files with the new command)
+- To be able to add multiple watchers (specifically the ones that calls the compilation function of emacs, the name of the compilation buffer of each of them should be changed right after the execution of the commands)
+- Marking a folder instead of a file should just do the process on all the files that are included inside that folder
+- The user should be able to add a new watcher by entering the file name or the folder name interactively instead of using dired mode.
+
+  
+  This is what is written in the documentation of the =compile= command of emacs : 
+  #+begin_note
+To run more than one compilation at once, start one then rename
+the ‘*compilation*’ buffer to some other name with
+C-x x r.  Then _switch buffers_ and start the new compilation.
+It will create a new ‘*compilation*’ buffer.
+  #+end_note
+  
