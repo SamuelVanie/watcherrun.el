@@ -39,7 +39,7 @@ intermediate
 - Use `file-exists-p`, `file-readable-p` for path validation - they're cross-platform
 - Handle Windows vs Unix path differences with `file-name-as-directory`
 - Use `expand-file-name` to resolve `~/` and relative paths
-- Regular expressions should be carefully tested for edge cases
+- Regular expressions should be carefully tested for edge cases (`test/` folder)
 - Provide helpful error messages that guide users to solutions
 - Use `pcase` for pattern matching - it's modern and efficient
 
