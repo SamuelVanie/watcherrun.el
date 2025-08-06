@@ -11,9 +11,10 @@
 
 ;; Required packages
 (require 'ring)
+(require 'cl-lib)
 
 ;;; Watcher structure definition
-(defstruct watcherrun-watcher
+(cl-defstruct watcherrun-watcher
   "Structure representing a file watcher.
 Each watcher monitors paths and executes commands when files change."
   id               ; Unique identifier string
