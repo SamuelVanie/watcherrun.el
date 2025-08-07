@@ -10,3 +10,5 @@
 - [x] UI-001: Implement Menu Bar Interface using easy-menu
 - [x] EXEC-001: Implement Menu Bar Interface using easy-menu
 - [x] EXEC-002: Implement Lisp Expression Evaluator with Safety Sandbox
+- [x] EXEC-003: Implement Compilation Buffer Manager for Multiple Concurrent Compilations
+- [x] UI-002: Implement Dired Integration for File Selection

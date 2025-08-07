@@ -142,6 +142,11 @@ Key starting points to read first:
   - `watcherrun-detect-file-type`: File type detection by extension
   - `watcherrun-suggest-command`: Smart command suggestions
 
+## Dired Integration
+- Implemented in watcherrun-ui.el with keybinding 'W' in Dired mode
+- Functions: `watcherrun-dired-add-watcher`, `watcherrun--prompt-command-type`, `watcherrun--prompt-recursion-for-directories`
+- Tests cover marking files, command prompts, and error handling scenarios
+
 ## Token & Tool Call Optimization
 - Use list-directory on project root once to understand structure instead of multiple specific path checks
 - When testing, modify existing test files rather than creating redundant new ones

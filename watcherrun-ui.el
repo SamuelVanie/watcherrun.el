@@ -12,6 +12,8 @@
 
 ;;; Code:
 
+(require 'dired)
+
 (unless (featurep 'easy-menu)
   (require 'easymenu nil t))
 (unless (featurep 'easymenu)
@@ -155,7 +157,85 @@
 
 ;;; Initialization
 
+;;; Dired integration functions
+
+;;;###autoload
+(defun watcherrun--prompt-command-type ()
+  "Prompt user for command type with single character input."
+  (let ((choice (read-char-choice 
+                 "Execute (s)ystem command or (l)isp expression? " 
+                 '(?s ?l))))
+    (pcase choice
+      (?s 'system)
+      (?l 'lisp))))
+
+(defun watcherrun--prompt-recursion-for-directories (paths)
+  "Prompt for recursion setting if directories are included."
+  (when (seq-some #'file-directory-p paths)
+    (let ((choice (read-char-choice
+                   "Watch directories (i)mmediately or (r)ecursively? "
+                   '(?i ?r))))
+      (pcase choice
+        (?i nil)
+        (?r t)))))
+
+(defun watcherrun--create-watchers-for-paths (paths command command-type recursive)
+  "Create watchers for PATHS with COMMAND of COMMAND-TYPE and RECURSIVE setting."
+  (let (successful-ids failed-paths)
+    (dolist (path paths)
+      (condition-case err
+          (let ((watcher-id (watcherrun-add-watcher
+                             (list path)
+                             command
+                             command-type
+                             recursive)))
+            (push watcher-id successful-ids)
+            (message "Added watcher %s for %s" watcher-id path))
+        (error 
+         (push (cons path (error-message-string err)) failed-paths)
+         (message "Error creating watcher for %s: %s" 
+                  path (error-message-string err)))))
+    
+    ;; Report summary
+    (if successful-ids
+        (message "Created %d watcher(s) successfully"
+                 (length successful-ids))
+      (message "No watchers created"))
+    
+    (when failed-paths
+      (message "Failed to create watchers for: %s"
+               (mapconcat (lambda (fp) (car fp)) failed-paths ", ")))
+    
+    successful-ids))
+
+;;;###autoload
+(defun watcherrun-dired-add-watcher ()
+  "Add watcher for marked files in Dired."
+  (interactive)
+  (let ((marked-files (dired-get-marked-files))
+        (all-files (dired-get-marked-files nil nil)))
+    ;; Check if any files are actually marked (more than just current file)
+    (if (= (length marked-files) (length all-files))
+        (message "No files marked. Use 'm' to mark files first.")
+      
+      ;; Get command type
+      (let ((command-type (watcherrun--prompt-command-type))
+            (recursive (watcherrun--prompt-recursion-for-directories marked-files)))
+        
+        ;; Get command string
+        (let ((command (read-string "Enter command to execute: ")))
+          
+          ;; Validate and create watchers
+          (watcherrun--create-watchers-for-paths marked-files command command-type recursive))))))
+
+;;; Dired keybinding
+(defun watcherrun-setup-dired-integration ()
+  "Set up Dired integration for WatcherRun."
+  (with-eval-after-load 'dired
+    (define-key dired-mode-map (kbd "W") 'watcherrun-dired-add-watcher)))
+
 (add-hook 'after-init-hook 'watcherrun-update-menu-state)
+(add-hook 'after-init-hook 'watcherrun-setup-dired-integration)
 
 (provide 'watcherrun-ui)
 ;;; watcherrun-ui.el ends here

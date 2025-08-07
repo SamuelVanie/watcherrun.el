@@ -1,5 +1,7 @@
 * Project Specifications
 
+go ahead and implement the =task_002= from the =execution_layer=. Write test and make sure they run. Make sure existing tests also run if you introduce changes that could break existing functionalities. Make sure to update the =tasks/done.md= file when finished
+
 ** Description
 
 - This is a project that will permits to programmers inside emacs, to call some specific system command or emacs-lisp function at file event.
