@@ -5,6 +5,7 @@
 ;;; Commentary:
 ;; This file contains the support components for WatcherRun, including:
 ;; - Session storage (watcher registry, buffer associations, error logging)
+;; - Error handling and dedicated error buffer management
 ;; - Helper functions for data access and manipulation
 
 ;;; Code:
@@ -12,6 +13,7 @@
 ;; Required packages
 (require 'ring)
 (require 'cl-lib)
+(require 'compile)
 
 ;;; Watcher structure definition
 (cl-defstruct watcherrun-watcher
@@ -148,6 +150,281 @@ Each watcher monitors paths and executes commands when files change."
                       (watcherrun-get-watcher most-active))))
           (setq watcherrun-statistics
                 (plist-put watcherrun-statistics :most-active-watcher watcher-id)))))))
+
+;;; Error handling system
+
+;; Error type constants
+(defconst watcherrun-error-file-error 'file-error
+  "Error type for file system issues (permission denied, file not found).")
+
+(defconst watcherrun-error-command-error 'command-error
+  "Error type for system command execution failures.")
+
+(defconst watcherrun-error-lisp-error 'lisp-error
+  "Error type for Emacs Lisp evaluation errors.")
+
+(defconst watcherrun-error-process-error 'process-error
+  "Error type for async process management issues.")
+
+(defconst watcherrun-error-validation-error 'validation-error
+  "Error type for user input validation failures.")
+
+(defconst watcherrun-error-internal-error 'internal-error
+  "Error type for unexpected system errors.")
+
+;; Error buffer and display
+(defvar watcherrun-error-buffer-name "*WatcherRun Errors*"
+  "Name of the buffer for displaying WatcherRun errors.")
+
+(defvar watcherrun-show-error-notifications t
+  "Whether to show notifications for errors.")
+
+(defun watcherrun-log-error (watcher-id error-type message &optional context)
+  "Log error with full context for debugging.
+WATCHER-ID is the ID of the watcher that encountered the error.
+ERROR-TYPE is one of the watcherrun-error-* constants.
+MESSAGE is the error message.
+CONTEXT is optional additional information about the error."
+  (let ((error-entry (list
+                     :timestamp (current-time)
+                     :watcher-id watcher-id
+                     :error-type error-type
+                     :message message
+                     :context context
+                     :stack-trace (when (eq error-type 'lisp-error)
+                                   (backtrace-to-string)))))
+    
+    ;; Add to error log
+    (ring-insert watcherrun-error-log error-entry)
+    
+    ;; Update statistics
+    (setq watcherrun-statistics
+          (plist-put watcherrun-statistics
+                     :total-errors
+                     (1+ (or (plist-get watcherrun-statistics :total-errors) 0))))
+    
+    ;; Update error buffer
+    (watcherrun-update-error-buffer error-entry)
+    
+    ;; Show notification if enabled
+    (when watcherrun-show-error-notifications
+      (watcherrun-show-error-notification error-entry))))
+
+(defun watcherrun-format-error-entry (error-entry)
+  "Format ERROR-ENTRY for display in the error buffer."
+  (let* ((timestamp (plist-get error-entry :timestamp))
+         (watcher-id (plist-get error-entry :watcher-id))
+         (error-type (plist-get error-entry :error-type))
+         (message (plist-get error-entry :message))
+         (context (plist-get error-entry :context))
+         (stack-trace (plist-get error-entry :stack-trace))
+         (formatted-time (format-time-string "[%Y-%m-%d %H:%M:%S]" timestamp))
+         (error-type-str (upcase (symbol-name error-type))))
+    
+    (concat formatted-time " " error-type-str
+            (when watcher-id
+              (format " (Watcher: %s)" watcher-id))
+            "
+"
+            message
+            (when context
+              (concat "
+Context: " context))
+            (when stack-trace
+              (concat "
+Stack trace:
+" stack-trace))
+            "
+"
+            (watcherrun-format-error-actions error-entry)
+            "
+
+")))
+
+(defun watcherrun-format-error-actions (error-entry)
+  "Format recovery actions for ERROR-ENTRY based on error type."
+  (let ((error-type (plist-get error-entry :error-type))
+        (watcher-id (plist-get error-entry :watcher-id)))
+    (concat "Actions: "
+            (cond
+             ((eq error-type 'file-error)
+              "[R]etry [U]pdate Path [D]isable Watcher")
+             ((eq error-type 'command-error)
+              "[R]etry [D]isable Watcher [E]dit Command")
+             ((eq error-type 'lisp-error)
+              "[E]dit Expression [D]isable Watcher")
+             ((eq error-type 'process-error)
+              "[R]etry [D]isable Watcher")
+             ((eq error-type 'validation-error)
+              "[E]dit Command/Path [D]isable Watcher")
+             ((eq error-type 'internal-error)
+              "[C]lear Error [D]isable Watcher")
+             (t "[C]lear")))))
+
+(defun watcherrun-update-error-buffer (error-entry)
+  "Update error buffer with ERROR-ENTRY."
+  (let ((buf (get-buffer-create watcherrun-error-buffer-name)))
+    (with-current-buffer buf
+      (let ((inhibit-read-only t)
+            (window (get-buffer-window buf))
+            (pos (point)))
+        
+        ;; Enable watcherrun-error-mode if not already
+        (unless (eq major-mode 'watcherrun-error-mode)
+          (watcherrun-error-mode))
+        
+        ;; Insert header if empty buffer
+        (when (= (buffer-size) 0)
+          (insert "=== WatcherRun Error Log ===
+
+"))
+        
+        ;; Insert new error at the top (after header)
+        (goto-char (point-min))
+        (forward-line 2)
+        (insert (watcherrun-format-error-entry error-entry))
+        
+        ;; Restore position if viewing
+        (when window
+          (with-selected-window window
+            (goto-char pos))))
+      
+      ;; Display buffer in a window if not already visible
+      (unless (get-buffer-window buf)
+        (display-buffer buf)))))
+
+(defun watcherrun-show-error-notification (error-entry)
+  "Show notification for ERROR-ENTRY using `message'."
+  (let ((error-type (plist-get error-entry :error-type))
+        (message-text (plist-get error-entry :message))
+        (watcher-id (plist-get error-entry :watcher-id)))
+    (message "WatcherRun %s: %s%s"
+             (upcase (symbol-name error-type))
+             message-text
+             (if watcher-id (format " (Watcher: %s)" watcher-id) ""))))
+
+;; Error buffer mode
+(define-derived-mode watcherrun-error-mode special-mode "WatcherRun-Errors"
+  "Major mode for displaying WatcherRun errors."
+  :group 'watcherrun
+  (setq buffer-read-only t)
+  (buffer-disable-undo)
+  (setq truncate-lines t)
+  
+  ;; Font locking
+  (setq font-lock-defaults
+        '((
+           ("\\[.*?\\]" . font-lock-constant-face)
+           ("\\[\\([0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\}.*?\\]" . font-lock-comment-face)
+           ("COMMAND-ERROR" . compilation-error-face)
+           ("FILE-ERROR" . compilation-error-face)
+           ("LISP-ERROR" . compilation-error-face)
+           ("PROCESS-ERROR" . compilation-error-face)
+           ("VALIDATION-ERROR" . compilation-warning-face)
+           ("INTERNAL-ERROR" . compilation-error-face)
+           ("Watcher:.*$" . font-lock-function-name-face)
+           ("Context:.*$" . font-lock-comment-face)
+           ("Actions:.*$" . font-lock-keyword-face)
+           ))))
+
+;; Interactive commands for error buffer
+(defun watcherrun-retry-command ()
+  "Retry the command associated with the error at point."
+  (interactive)
+  (let ((error-entry (watcherrun-get-error-at-point))
+        (watcher-id (watcherrun-get-watcher-id-at-point)))
+    (when (and error-entry watcher-id)
+      (message "Retrying command for watcher: %s" watcher-id)
+      ;; Actual retry logic would call back to core-engine
+      )))
+
+(defun watcherrun-disable-watcher ()
+  "Disable the watcher associated with the error at point."
+  (interactive)
+  (let ((watcher-id (watcherrun-get-watcher-id-at-point)))
+    (when watcher-id
+      (message "Disabling watcher: %s" watcher-id)
+      (let ((watcher (watcherrun-get-watcher watcher-id)))
+        (when watcher
+          (setf (watcherrun-watcher-status watcher) 'paused)
+          (watcherrun-store-watcher watcher))))))
+
+(defun watcherrun-edit-command ()
+  "Edit the command associated with the error at point."
+  (interactive)
+  (let ((watcher-id (watcherrun-get-watcher-id-at-point)))
+    (when watcher-id
+      (message "Editing command for watcher: %s" watcher-id)
+      ;; This would open a prompt or buffer to edit the command
+      )))
+
+(defun watcherrun-update-paths ()
+  "Update the paths associated with the error at point."
+  (interactive)
+  (let ((watcher-id (watcherrun-get-watcher-id-at-point)))
+    (when watcher-id
+      (message "Updating paths for watcher: %s" watcher-id)
+      ;; This would open a prompt to update paths
+      )))
+
+(defun watcherrun-clear-error ()
+  "Clear the error at point from the log."
+  (interactive)
+  (let ((inhibit-read-only t))
+    (let ((beg (line-beginning-position)))
+      (while (not (looking-at "^\\[.*?\\].*$"))
+        (forward-line -1))
+      (let ((end (progn 
+                   (forward-paragraph)
+                   (point))))
+        (delete-region beg end)
+        (message "Error cleared")))))
+
+(defun watcherrun-clear-all-errors ()
+  "Clear all errors from the log."
+  (interactive)
+  (when (yes-or-no-p "Clear all errors? ")
+    (let ((inhibit-read-only t))
+      (erase-buffer)
+      (insert "=== WatcherRun Error Log ===
+
+")
+      (setq watcherrun-error-log (make-ring 100))
+      (message "All errors cleared"))))
+
+(defun watcherrun-get-error-at-point ()
+  "Get the error entry at point, or nil if none."
+  (save-excursion
+    (while (not (or (looking-at "^\\[.*?\\].*$") (bobp)))
+      (forward-line -1))
+    (when (looking-at "^\\[\\([0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\}.*?\\]\\) \\([A-Z-]+\\)\\(.*\\)$")
+      ;; This is simplified - in a real implementation, we'd look up the actual error entry
+      (let ((timestamp (match-string 1))
+            (error-type (match-string 2))
+            (watcher-info (match-string 3)))
+        (list :timestamp timestamp
+              :error-type (intern (downcase error-type))
+              :watcher-id (when (string-match "Watcher: \\(.*?\\)" watcher-info)
+                            (match-string 1 watcher-info)))))))
+
+(defun watcherrun-get-watcher-id-at-point ()
+  "Get the watcher ID associated with the error at point."
+  (let ((error-entry (watcherrun-get-error-at-point)))
+    (when error-entry
+      (plist-get error-entry :watcher-id))))
+
+;; Key bindings for error buffer
+(defvar watcherrun-error-mode-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map (kbd "r") 'watcherrun-retry-command)
+    (define-key map (kbd "d") 'watcherrun-disable-watcher)
+    (define-key map (kbd "e") 'watcherrun-edit-command)
+    (define-key map (kbd "u") 'watcherrun-update-paths)
+    (define-key map (kbd "c") 'watcherrun-clear-error)
+    (define-key map (kbd "C") 'watcherrun-clear-all-errors)
+    (define-key map (kbd "q") 'quit-window)
+    map)
+  "Keymap for WatcherRun error buffer.")
 
 (provide 'watcherrun-support)
 ;;; watcherrun-support.el ends here

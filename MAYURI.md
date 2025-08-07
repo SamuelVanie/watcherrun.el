@@ -18,14 +18,30 @@ Why it exists:
 
 ## Running Tests
 Framework: ERT
-Typical batch command pattern (adjust file paths when tests exist):
+
+### Running All Tests
 ```sh
-emacs -Q --batch -l ert -l test/test-watcherrun.el -f ert-run-tests-batch-and-exit
+emacs -Q --batch -l ert -l watcherrun-support.el -l watcherrun-utils.el -l test/test-support.el -l test/test-utils.el -f ert-run-tests-batch-and-exit
 ```
-If tests are split:
+
+### Running Tests for Specific Components
 ```sh
-emacs -Q --batch -l ert -l test/test-core.el -l test/test-exec.el -f ert-run-tests-batch-and-exit
+# For support components only
+emacs -Q --batch -l ert -l watcherrun-support.el -l test/test-support.el -f ert-run-tests-batch-and-exit
+
+# For utility functions only
+emacs -Q --batch -l ert -l watcherrun-support.el -l watcherrun-utils.el -l test/test-utils.el -f ert-run-tests-batch-and-exit
 ```
+
+### Writing Tests
+When implementing new features, follow these testing guidelines:
+
+1. Create a test file named `test-<component>.el` in the `test/` directory
+2. Include setup/teardown functions for creating temporary test resources
+3. Use `ert-deftest` to define tests with descriptive names (`watcherrun-test-<function-name>`)
+4. Test both happy paths and error cases
+5. For file operations, create and clean up temporary files
+6. Run tests frequently during development to catch issues early
 
 # Codebase Structure & Key Areas
 
@@ -43,12 +59,29 @@ See .mayuri/ for design details:
 - component_user_interface.md
 
 ## Core Directories & Entry Points
-Planned/expected files (align with your preferred naming once implemented):
+
+### Current Directory Structure
+```
+~/projects/watcherrun.el/
+├── .mayuri/           # Design documents and architecture details
+├── test/              # Test directory
+│   ├── test-support.el # Tests for support components
+│   └── test-utils.el   # Tests for utility functions
+├── LICENSE            # Project license
+├── MAYURI.md          # This development guide
+├── project_spec.org   # Project specifications
+├── watcherrun-support.el # Support components implementation
+├── watcherrun-utils.el   # Utility functions implementation
+└── watcherrun.el      # Main package file
+```
+
+### Planned Files (align with your preferred naming once implemented):
 - watcherrun.el: Package entry; provides user-facing commands and sets up the menu.
 - watcherrun-core.el: Watcher registry, add/remove/modify/list, file-notify setup and callbacks.
 - watcherrun-exec.el: Command dispatch; system vs Lisp evaluations; placeholder expansion.
 - watcherrun-compilation.el: Compilation buffer naming/management for concurrent builds.
 - watcherrun-support.el: Error handler, session storage, utilities.
+- watcherrun-utils.el: Path validation, command parsing, ID generation, file type detection.
 - ui/watcherrun-dired.el: Dired integration, interactive prompts.
 - test/*.el: ERT tests per component.
 
@@ -73,6 +106,27 @@ Key starting points to read first:
 - Compilation buffers: Emacs by default uses "*compilation*". This project auto-renames buffers per watcher to allow multiple parallel compilations.
 - System commands may require environment setup (PATH). If Emacs doesn’t inherit your shell environment, configure exec-path-from-shell on macOS.
 - Safety for Lisp execution: validation blocks dangerous functions; prefer explicit, minimal expressions.
+
+# Development Tips
+
+## Workflow Optimization
+- Start by checking MAYURI.md for updated project structure and testing instructions
+- Before adding new features, run existing tests to verify nothing is broken
+- Key utility functions are already implemented in watcherrun-utils.el:
+  - `watcherrun-validate-path`: Path validation with informative errors
+  - `watcherrun-normalize-path`: Cross-platform path normalization
+  - `watcherrun-parse-command`: Command parsing with type detection
+  - `watcherrun-expand-placeholders`: Template variable expansion
+  - `watcherrun-generate-unique-id`: Watcher ID generation
+  - `watcherrun-detect-file-type`: File type detection by extension
+  - `watcherrun-suggest-command`: Smart command suggestions
+
+## Token & Tool Call Optimization
+- Use list-directory on project root once to understand structure instead of multiple specific path checks
+- When testing, modify existing test files rather than creating redundant new ones
+- Refer to existing implementations for coding style and patterns
+- The project uses a consistent naming scheme: `watcherrun-<component>-<function>`
+- Store common references in variables rather than repeatedly looking them up
 
 ---
 Continuous improvement
