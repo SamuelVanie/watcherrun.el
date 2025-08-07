@@ -287,7 +287,7 @@ Returns a list of descriptors for all created watchers."
   "Execute Lisp COMMAND for WATCHER."
   (watcherrun-log-info "Executing Lisp command: %s" command)
   (condition-case err
-      (eval (read-from-string command) t)
+      (eval (car (read-from-string command)) t)
     (error
      (error "Lisp execution error: %s" (error-message-string err)))))
 

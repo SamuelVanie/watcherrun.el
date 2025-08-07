@@ -43,6 +43,7 @@ Watch files and directories and run commands when they change.
 ```elisp
 (use-package watcherrun
   :ensure t
+  :demand t
   :config
   (watcherrun-mode 1))
 ```
