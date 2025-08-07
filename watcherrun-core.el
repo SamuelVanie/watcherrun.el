@@ -51,17 +51,27 @@
   :group 'watcherrun)
 
 (defcustom watcherrun-debounce-time 0.1
-  "Time in seconds to debounce rapid file change events."
+  "Time in seconds to debounce rapid file change events.
+
+Prevents commands from executing multiple times when a single file
+change triggers multiple file system events. Increase this value
+if you experience excessive command executions."
   :type 'number
   :group 'watcherrun-core)
 
 (defcustom watcherrun-ignore-patterns '("\\.tmp$" "~$" "\\.bak$" "\\.swp$")
-  "List of regexp patterns for files to ignore."
+  "List of regexp patterns for files to ignore.
+
+Files matching these patterns will not trigger command execution.
+Useful for ignoring editor backup files, temporary files, etc."
   :type '(repeat string)
   :group 'watcherrun-core)
 
 (defcustom watcherrun-ignore-hidden-files t
-  "Whether to ignore hidden files (starting with '.')."
+  "Whether to ignore hidden files (starting with '.').
+
+When enabled, changes to files like .git/*, .DS_Store, etc.
+will not trigger command execution."
   :type 'boolean
   :group 'watcherrun-core)
 

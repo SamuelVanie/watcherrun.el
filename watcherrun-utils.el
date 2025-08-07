@@ -54,8 +54,8 @@ Returns a plist with command information."
 Supported placeholders:
 - {{file}}: Full path of changed file
 - {{filename}}: Just the filename without path
-- {{dir}}: Directory containing the file
-- {{ext}}: File extension
+- {{dirname}}: Directory containing the file
+- {{extension}}: File extension
 - {{basename}}: Filename without extension"
   (let* ((file-name (file-name-nondirectory file-path))
          (dir-name (file-name-directory file-path))
@@ -68,8 +68,8 @@ Supported placeholders:
        (pcase (match-string 1 match)
          ("file" file-path)
          ("filename" file-name)
-         ("dir" dir-name)
-         ("ext" (or extension ""))
+         ("dirname" dir-name)
+         ("extension" (or extension ""))
          ("basename" basename)
          (_ match)))  ; Return unchanged if unknown placeholder
      command)))

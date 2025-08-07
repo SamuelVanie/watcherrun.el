@@ -32,17 +32,26 @@
   :group 'watcherrun)
 
 (defcustom watcherrun-clear-output-on-execution t
-  "Whether to clear output buffer before new execution."
+  "Whether to clear output buffer before new execution.
+
+When enabled, output buffers are cleared before running new commands,
+making it easier to see the current execution's output."
   :type 'boolean
   :group 'watcherrun-exec)
 
 (defcustom watcherrun-compilation-commands '("make" "compile" "build" "test" "npm" "yarn" "cargo" "go")
-  "List of commands that should use compilation mode."
+  "List of commands that should use compilation mode.
+
+Commands starting with these strings will be executed in compilation
+mode, enabling error navigation and syntax highlighting."
   :type '(repeat string)
   :group 'watcherrun-exec)
 
 (defcustom watcherrun-lisp-evaluation-timeout 5.0
-  "Timeout in seconds for Lisp expression evaluation."
+  "Timeout in seconds for Lisp expression evaluation.
+
+Prevents infinite loops or long-running Lisp expressions from
+blocking Emacs. Expressions exceeding this timeout are terminated."
   :type 'number
   :group 'watcherrun-exec)
 
@@ -84,10 +93,7 @@
     "Report error with MESSAGE."
     (message "[WatcherRun ERROR] %s" message)))
 
-;; Add function to expand placeholders for now
-(defun watcherrun-expand-placeholders (command file-path)
-  "Simple placeholder expansion for testing."
-  (replace-regexp-in-string "{{file}}" file-path command))
+
 
 ;; Main execution dispatcher
 (defun watcherrun-execute-system-command (command file-path watcher-id)

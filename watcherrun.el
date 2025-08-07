@@ -28,13 +28,28 @@
 ;; Emacs menu for a smooth workflow.
 ;;
 ;; Main features:
-;; - Run commands when files change (shell commands or Emacs Lisp)
-;; - Uses Emacs' built-in file-notify APIs (no external dependencies)
-;; - Multiple concurrent watchers with separate compilation buffers
-;; - Dired integration for easy setup
-;; - Comprehensive error handling
+;; - Native Emacs Integration: Uses built-in file-notify APIs, no external dependencies
+;; - Flexible Command Execution: Run system commands or Emacs Lisp expressions
+;; - Multiple Watchers: Manage concurrent file watchers with dedicated compilation buffers
+;; - Smart Menu Integration: Menu bar interface with keyboard shortcuts (C-c w [l|a|d|m|e])
+;; - Dired Integration: Add watchers directly from Dired with 'W' key
+;; - Cross-Platform: Works on Linux (inotify), macOS (fsevents), and Windows (w32notify)
+;; - Template Variables: Use {{file}}, {{basename}}, {{dirname}} in commands
+;; - Error Handling: Dedicated error buffer with structured logging
+;; - Session Storage: No configuration files - clean and simple
 ;;
-;; See README.md for more information.
+;; Quick Start:
+;; 1. Enable WatcherRun: M-x watcherrun-mode
+;; 2. Add a watcher: C-c w a or use the WatcherRun menu
+;; 3. Edit your file and watch the command execute automatically
+;;
+;; Template Variables:
+;; - {{file}} - Full path to the changed file
+;; - {{basename}} - Filename without extension
+;; - {{dirname}} - Directory containing the file
+;; - {{extension}} - File extension (without dot)
+;;
+;; See README.md for comprehensive documentation.
 
 ;;; Code:
 
@@ -51,7 +66,11 @@
 ;; Customization options
 
 (defcustom watcherrun-show-error-notifications t
-  "If non-nil, show notifications when errors occur."
+  "Whether to show desktop notifications when errors occur.
+
+When enabled, critical errors like command failures will trigger
+desktop notifications to alert the user even when Emacs is not
+in the foreground."
   :type 'boolean
   :group 'watcherrun)
 

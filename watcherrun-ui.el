@@ -40,7 +40,16 @@
 
 ;;;###autoload
 (defun watcherrun-add-watcher-interactive ()
-  "Add watcher by prompting for file/directory path."
+  "Interactively add a file watcher with prompts and completion.
+
+Prompts the user for:
+- File or directory path (with file completion)
+- Command to execute when files change
+- Command type (system or lisp)
+- Recursive watching option for directories
+
+Uses `read-file-name' for path completion and validates the path exists.
+Template variables like {{file}}, {{basename}} can be used in commands."
   (interactive)
   (let ((path (read-file-name "Watch file or directory: " 
                               nil nil t)))
@@ -66,8 +75,11 @@
        (message "Error: %s" (error-message-string error))))))
 
 ;;;###autoload
-(defun watcherrun-delete-watcher-menu ()
-  "Delete a watcher by prompting for ID."
+(defun watcherrun-delete-watcher-interactive ()
+  "Interactively select and delete a watcher.
+
+Displays a list of all active watchers for selection using completing-read.
+Shows watcher details to help with identification."
   (interactive)
   (let ((watchers-list (watcherrun-list-watchers)))
     (if watchers-list
@@ -84,8 +96,14 @@
       (message "No watchers to delete"))))
 
 ;;;###autoload
-(defun watcherrun-modify-watcher-menu ()
-  "Modify a watcher's command by prompting for ID and new command."
+(defun watcherrun-modify-watcher-interactive ()
+  "Interactively select and modify a watcher's configuration.
+
+Allows modification of:
+- Command string
+- Command type (system or lisp)
+
+Uses completing-read to select from active watchers."
   (interactive)
   (let ((watchers-list (watcherrun-list-watchers)))
     (if watchers-list
@@ -103,8 +121,11 @@
       (message "No watchers to modify"))))
 
 ;;;###autoload
-(defun watcherrun-show-error-buffer ()
-  "Show the WatcherRun error buffer."
+(defun watcherrun-show-errors ()
+  "Display the WatcherRun error buffer.
+
+Shows all logged errors, warnings, and debug information.
+The error buffer includes timestamps and actionable error details."
   (interactive)
   (let ((error-buffer (get-buffer "*WatcherRun Errors*")))
     (if error-buffer
@@ -126,16 +147,16 @@
      :keys "C-c w a"
      :help "Add a new file watcher"]
     "---"
-    ["Delete Watcher" watcherrun-delete-watcher-menu
+    ["Delete Watcher" watcherrun-delete-watcher-interactive
      :keys "C-c w d"
      :enable (> (watcherrun-get-watcher-count) 0)
      :help "Delete an existing watcher"]
-    ["Modify Watcher" watcherrun-modify-watcher-menu
+    ["Modify Watcher" watcherrun-modify-watcher-interactive
      :keys "C-c w m"
      :enable (> (watcherrun-get-watcher-count) 0)
      :help "Modify watcher command"]
     "---"
-    ["Show Error Buffer" watcherrun-show-error-buffer
+    ["Show Errors" watcherrun-show-errors
      :keys "C-c w e"
      :help "Show error log buffer"]))
 
@@ -148,9 +169,9 @@
   (setq watcherrun-mode-map (make-sparse-keymap))
   (define-key watcherrun-mode-map (kbd "C-c w l") 'watcherrun-list-watchers-menu)
   (define-key watcherrun-mode-map (kbd "C-c w a") 'watcherrun-add-watcher-interactive)
-  (define-key watcherrun-mode-map (kbd "C-c w d") 'watcherrun-delete-watcher-menu)
-  (define-key watcherrun-mode-map (kbd "C-c w m") 'watcherrun-modify-watcher-menu)
-  (define-key watcherrun-mode-map (kbd "C-c w e") 'watcherrun-show-error-buffer))
+  (define-key watcherrun-mode-map (kbd "C-c w d") 'watcherrun-delete-watcher-interactive)
+  (define-key watcherrun-mode-map (kbd "C-c w m") 'watcherrun-modify-watcher-interactive)
+  (define-key watcherrun-mode-map (kbd "C-c w e") 'watcherrun-show-errors))
 
 ;;; Menu state management
 

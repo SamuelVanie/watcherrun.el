@@ -118,11 +118,11 @@
                      "echo file.txt"))
     
     ;; Test directory placeholder
-    (should (string= (watcherrun-expand-placeholders "cd {{dir}}" file-path)
+    (should (string= (watcherrun-expand-placeholders "cd {{dirname}}" file-path)
                      "cd /home/user/projects/test/"))
     
     ;; Test extension placeholder
-    (should (string= (watcherrun-expand-placeholders "Extension: {{ext}}" file-path)
+    (should (string= (watcherrun-expand-placeholders "Extension: {{extension}}" file-path)
                      "Extension: txt"))
     
     ;; Test basename placeholder
@@ -131,7 +131,7 @@
     
     ;; Test multiple placeholders
     (should (string= (watcherrun-expand-placeholders 
-                      "{{basename}}.{{ext}} in {{dir}}" file-path)
+                      "{{basename}}.{{extension}} in {{dirname}}" file-path)
                      "file.txt in /home/user/projects/test/"))
     
     ;; Test unknown placeholder
