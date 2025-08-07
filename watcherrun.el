@@ -1,11 +1,11 @@
 ;;; -*- lexical-binding: t; -*-
 ;;; watcherrun.el --- Watch files and run commands when they change -*- lexical-binding: t; -*-
 
-;; Author: The WatcherRun Contributors
+;; Author: Samuel Michael VANIE
 ;; Version: 0.1.0
 ;; Package-Requires: ((emacs "27.1"))
 ;; Keywords: convenience, files, processes
-;; URL: https://github.com/username/watcherrun.el
+;; URL: https://github.com/SamuelVanie/watcherrun.el
 
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by

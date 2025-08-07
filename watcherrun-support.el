@@ -1,6 +1,6 @@
 ;;; watcherrun-support.el --- Support functions for WatcherRun -*- lexical-binding: t; -*-
 
-;; Author: The WatcherRun Contributors
+;; Author: Samuel Michael VANIE
 
 ;;; Commentary:
 ;; This file contains the support components for WatcherRun, including:

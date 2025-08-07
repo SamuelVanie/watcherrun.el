@@ -2,7 +2,7 @@
 
 ;; Copyright (C) 2023 WatcherRun Contributors
 
-;; Author: WatcherRun Contributors
+;; Author: Samuel Michael VANIE
 ;; Keywords: convenience, tools, processes
 
 ;; This file is not part of GNU Emacs.

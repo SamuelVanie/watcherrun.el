@@ -1,6 +1,6 @@
 ;;; watcherrun-utils.el --- Utility functions for WatcherRun -*- lexical-binding: t; -*-
 
-;; Author: The WatcherRun Contributors
+;; Author: Samuel Michael VANIE
 
 ;;; Commentary:
 ;; This file contains utility functions for path validation, command parsing,
