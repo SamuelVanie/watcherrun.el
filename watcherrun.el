@@ -38,6 +38,8 @@
 
 ;;; Code:
 
+(require 'watcherrun-ui)
+
 (defgroup watcherrun nil
   "Watch files and run commands when they change."
   :group 'convenience
@@ -49,60 +51,6 @@
   "If non-nil, show notifications when errors occur."
   :type 'boolean
   :group 'watcherrun)
-
-;; Core variables will be defined here
-
-;; Declare autoloads for other files
-;; (These will be implemented in other modules)
-
-;;;###autoload
-(defun watcherrun-add-watcher ()
-  "Add a new file watcher."
-  (interactive)
-  (message "watcherrun-add-watcher not yet implemented"))
-
-;;;###autoload
-(defun watcherrun-list-watchers ()
-  "List all active watchers."
-  (interactive)
-  (message "watcherrun-list-watchers not yet implemented"))
-
-;;;###autoload
-(defun watcherrun-remove-watcher ()
-  "Remove a watcher."
-  (interactive)
-  (message "watcherrun-remove-watcher not yet implemented"))
-
-;;;###autoload
-(defun watcherrun-pause-watcher ()
-  "Pause a watcher."
-  (interactive)
-  (message "watcherrun-pause-watcher not yet implemented"))
-
-;;;###autoload
-(defun watcherrun-resume-watcher ()
-  "Resume a paused watcher."
-  (interactive)
-  (message "watcherrun-resume-watcher not yet implemented"))
-
-;; Menu definition
-(defvar watcherrun-menu nil
-  "Menu for WatcherRun.")
-
-(easy-menu-define watcherrun-menu nil
-  "Menu for WatcherRun."
-  '("WatcherRun"
-    ["Add Watcher" watcherrun-add-watcher t]
-    ["List Watchers" watcherrun-list-watchers t]
-    ["Remove Watcher" watcherrun-remove-watcher t]
-    "--"
-    ["Pause Watcher" watcherrun-pause-watcher t]
-    ["Resume Watcher" watcherrun-resume-watcher t]
-    "--"
-    ["Show Error Log" (display-buffer "*WatcherRun Errors*") t]))
-
-;; Load menu on package load
-(easy-menu-add-item nil '("Tools") watcherrun-menu "Search Files (Grep)...")
 
 (provide 'watcherrun)
 ;;; watcherrun.el ends here
