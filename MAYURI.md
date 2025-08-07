@@ -41,7 +41,7 @@ When implementing new features, follow these testing guidelines:
 3. Use `ert-deftest` to define tests with descriptive names (`watcherrun-test-<function-name>`)
 4. Test both happy paths and error cases
 5. For file operations, create and clean up temporary files
-6. Run tests frequently during development to catch issues early
+6. Run tests everytime you implement changes into the files related to functionalities of package
 
 # Codebase Structure & Key Areas
 
