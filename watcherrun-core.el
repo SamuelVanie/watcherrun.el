@@ -281,4 +281,222 @@ Returns a list of descriptors for all created watchers."
     (error
      (error "Lisp execution error: %s" (error-message-string err)))))
 
+;; Watcher registry and path index
+(defvar watcherrun--path-index (make-hash-table :test 'equal)
+  "Hash table mapping file paths to watcher IDs for conflict detection.")
+
+;; Counter for unique ID generation
+(defvar watcherrun--watcher-counter 0
+  "Counter for generating unique watcher IDs.")
+
+;; Watcher manager functions
+
+(defun watcherrun-find-watcher-by-id (watcher-id)
+  "Find watcher by WATCHER-ID, return watcher structure or nil."
+  (gethash watcher-id watcherrun-watchers))
+
+(defun watcherrun-find-watcher-by-descriptor (descriptor)
+  "Find watcher by file notification DESCRIPTOR."
+  (cl-loop for watcher being the hash-values of watcherrun-watchers
+           when (member descriptor (watcherrun-watcher-file-descriptor watcher))
+           return watcher))
+
+(defun watcherrun--generate-watcher-id ()
+  "Generate a unique watcher ID."
+  (let ((timestamp (format-time-string "%Y%m%d%H%M%S" (current-time)))
+        (counter (cl-incf watcherrun--watcher-counter)))
+    (format "watcher-%s-%03d" timestamp counter)))
+
+(defun watcherrun--check-path-conflicts (paths)
+  "Check if any of PATHS are already being watched.
+Returns list of conflicting watcher IDs or nil if no conflicts."
+  (let (conflicts)
+    (dolist (path paths)
+      (let ((normalized-path (watcherrun-normalize-path path)))
+        (when-let ((existing-id (gethash normalized-path watcherrun--path-index)))
+          (push existing-id conflicts))))
+    conflicts))
+
+(defun watcherrun--register-path-index (paths watcher-id)
+  "Register PATHS for WATCHER-ID in the path index."
+  (dolist (path paths)
+    (let ((normalized-path (watcherrun-normalize-path path)))
+      (puthash normalized-path watcher-id watcherrun--path-index))))
+
+(defun watcherrun--unregister-path-index (paths)
+  "Remove PATHS from the path index."
+  (dolist (path paths)
+    (let ((normalized-path (watcherrun-normalize-path path)))
+      (remhash normalized-path watcherrun--path-index))))
+
+(defun watcherrun-add-watcher (paths command command-type recursive)
+  "Add new watcher with validation and registration.
+PATHS is a list of file/directory paths to watch.
+COMMAND is the command string to execute.
+COMMAND-TYPE is either 'system or 'lisp.
+RECURSIVE indicates whether to watch directories recursively.
+Returns watcher ID on success, signals error on failure."
+  ;; Input validation
+  (unless (and paths (listp paths) (not (null paths)))
+    (error "Paths must be a non-empty list"))
+  (unless (stringp command)
+    (error "Command must be a string"))
+  (unless (memq command-type '(system lisp))
+    (error "Command type must be 'system or 'lisp"))
+  
+  ;; Validate all paths exist
+  (dolist (path paths)
+    (unless (file-exists-p path)
+      (error "Path does not exist: %s" path)))
+  
+  ;; Check for path conflicts
+  (when-let ((conflicts (watcherrun--check-path-conflicts paths)))
+    (error "Paths already being watched by: %s" (string-join conflicts ", ")))
+  
+  ;; Validate command
+  (condition-case err
+      (watcherrun-validate-command command command-type)
+    (error (error "Command validation failed: %s" (error-message-string err))))
+  
+  ;; Generate unique ID
+  (let ((watcher-id (watcherrun--generate-watcher-id)))
+    
+    ;; Set up file notification
+    (let ((descriptors (watcherrun-setup-file-watcher 
+                        paths recursive #'watcherrun-handle-change-event)))
+      
+      ;; Create watcher structure
+      (let ((watcher (make-watcherrun-watcher
+                      :id watcher-id
+                      :paths paths
+                      :command command
+                      :command-type command-type
+                      :recursive recursive
+                      :file-descriptor descriptors
+                      :last-executed nil
+                      :execution-count 0
+                      :status 'active)))
+        
+        ;; Store in registry and path index
+        (puthash watcher-id watcher watcherrun-watchers)
+        (watcherrun--register-path-index paths watcher-id)
+        
+        (watcherrun-log-info "Added watcher %s for paths: %S" watcher-id paths)
+        watcher-id))))
+
+(defun watcherrun-remove-watcher (watcher-id)
+  "Remove watcher by WATCHER-ID and clean up all resources.
+Returns t on success, signals error if watcher not found."
+  (let ((watcher (watcherrun-find-watcher-by-id watcher-id)))
+    (unless watcher
+      (error "Watcher not found: %s" watcher-id))
+    
+    ;; Stop file notification
+    (when-let ((descriptors (watcherrun-watcher-file-descriptor watcher)))
+      (watcherrun-cleanup-file-watcher descriptors))
+    
+    ;; Clean up path index
+    (watcherrun--unregister-path-index (watcherrun-watcher-paths watcher))
+    
+    ;; Remove from registry
+    (remhash watcher-id watcherrun-watchers)
+    
+    (watcherrun-log-info "Removed watcher %s" watcher-id)
+    t))
+
+(defun watcherrun-modify-watcher (watcher-id new-command &optional new-command-type)
+  "Modify watcher command for WATCHER-ID.
+NEW-COMMAND replaces the existing command.
+NEW-COMMAND-TYPE optionally changes the command type.
+Preserves all other watcher settings including ID."
+  (let ((watcher (watcherrun-find-watcher-by-id watcher-id)))
+    (unless watcher
+      (error "Watcher not found: %s" watcher-id))
+    
+    ;; Determine command type
+    (let ((command-type (or new-command-type 
+                            (watcherrun-watcher-command-type watcher))))
+      
+      ;; Validate new command
+      (condition-case err
+          (watcherrun-validate-command new-command command-type)
+        (error (error "Command validation failed: %s" (error-message-string err))))
+      
+      ;; Update watcher
+      (setf (watcherrun-watcher-command watcher) new-command)
+      (setf (watcherrun-watcher-command-type watcher) command-type)
+      (setf (watcherrun-watcher-status watcher) 'active)
+      
+      (watcherrun-log-info "Modified watcher %s command to: %s" watcher-id new-command)
+      t)))
+
+(defun watcherrun-list-watchers ()
+  "Return a formatted list of all active watchers for display.
+Returns list of strings suitable for UI presentation."
+  (let (watcher-list)
+    (maphash (lambda (id watcher)
+               (push (format "[%s] %s -> %s (%s)"
+                             id
+                             (string-join (watcherrun-watcher-paths watcher) ", ")
+                             (watcherrun-watcher-command watcher)
+                             (watcherrun-watcher-command-type watcher))
+                     watcher-list))
+             watcherrun-watchers)
+    (sort watcher-list #'string<)))
+
+(defun watcherrun-get-watcher-count ()
+  "Return the number of active watchers."
+  (hash-table-count watcherrun-watchers))
+
+(defun watcherrun-pause-watcher (watcher-id)
+  "Pause watcher by WATCHER-ID, stopping file notifications."
+  (let ((watcher (watcherrun-find-watcher-by-id watcher-id)))
+    (unless watcher
+      (error "Watcher not found: %s" watcher-id))
+    
+    ;; Stop file notifications but keep watcher in registry
+    (when-let ((descriptors (watcherrun-watcher-file-descriptor watcher)))
+      (watcherrun-cleanup-file-watcher descriptors)
+      (setf (watcherrun-watcher-file-descriptor watcher) nil))
+    
+    (setf (watcherrun-watcher-status watcher) 'paused)
+    (watcherrun-log-info "Paused watcher %s" watcher-id)
+    t))
+
+(defun watcherrun-resume-watcher (watcher-id)
+  "Resume paused watcher by WATCHER-ID."
+  (let ((watcher (watcherrun-find-watcher-by-id watcher-id)))
+    (unless watcher
+      (error "Watcher not found: %s" watcher-id))
+    
+    (unless (eq (watcherrun-watcher-status watcher) 'paused)
+      (error "Watcher %s is not paused" watcher-id))
+    
+    ;; Re-establish file notifications
+    (let ((descriptors (watcherrun-setup-file-watcher
+                        (watcherrun-watcher-paths watcher)
+                        (watcherrun-watcher-recursive watcher)
+                        #'watcherrun-handle-change-event)))
+      (setf (watcherrun-watcher-file-descriptor watcher) descriptors)
+      (setf (watcherrun-watcher-status watcher) 'active)
+      
+      (watcherrun-log-info "Resumed watcher %s" watcher-id)
+      t)))
+
+(defun watcherrun-cleanup-all-watchers ()
+  "Clean up all watchers and reset the registry.
+Useful for session end or emergency cleanup."
+  (maphash (lambda (id watcher)
+             (when-let ((descriptors (watcherrun-watcher-file-descriptor watcher)))
+               (watcherrun-cleanup-file-watcher descriptors)))
+           watcherrun-watchers)
+  
+  ;; Clear all data structures
+  (clrhash watcherrun-watchers)
+  (clrhash watcherrun--path-index)
+  (setq watcherrun--watcher-counter 0)
+  
+  (watcherrun-log-info "Cleaned up all watchers")
+  t)
+
 ;;; watcherrun-core.el ends here
