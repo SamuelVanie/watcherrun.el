@@ -154,6 +154,13 @@ Key starting points to read first:
 - The project uses a consistent naming scheme: `watcherrun-<component>-<function>`
 - Store common references in variables rather than repeatedly looking them up
 
+## Interactive Command Features (UI-003)
+- ✅ Implemented `watcherrun-add-watcher-interactive` with tab completion using `read-file-name`
+- ✅ Uses same prompt functions as Dired integration (`watcherrun--prompt-command-type`, `watcherrun--prompt-recursion-for-directories`)
+- ✅ Path validation with `watcherrun-validate-path` and comprehensive error handling
+- ✅ 4 new test cases cover file/directory creation, invalid paths, and completion features
+- ✅ All 11 UI tests pass, existing tests still pass
+
 ---
 Continuous improvement
 This guide is living documentation. If you find gaps or friction points, please update MAYURI.md

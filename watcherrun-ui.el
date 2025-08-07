@@ -40,27 +40,30 @@
 
 ;;;###autoload
 (defun watcherrun-add-watcher-interactive ()
-  "Add a new file watcher interactively."
+  "Add watcher by prompting for file/directory path."
   (interactive)
-  (let* ((path (read-file-name "Path to watch: " default-directory nil t))
-         (normalized-path (watcherrun-normalize-path path))
-         (is-dir (file-directory-p normalized-path))
-         (recursive (if is-dir
-                        (y-or-n-p "Watch directory recursively? ")
-                      nil))
-         (command-type-char (read-char-choice
-                             "Command type: (s)ystem or (l)isp? "
-                             '(?s ?l)))
-         (command-type (if (eq command-type-char ?s) 'system 'lisp))
-         (command (read-string "Command to execute: ")))
-    (condition-case err
-        (let ((watcher-id (watcherrun-add-watcher
-                           (list normalized-path)
-                           command
-                           command-type
-                           recursive)))
-          (message "Added watcher %s for %s" watcher-id normalized-path))
-      (error (message "Error adding watcher: %s" (error-message-string err))))))
+  (let ((path (read-file-name "Watch file or directory: " 
+                              nil nil t)))
+    
+    ;; Validate path exists and is accessible
+    (condition-case error
+        (progn
+          (watcherrun-validate-path path)
+          
+          ;; Get command type and recursion settings
+          (let ((command-type (watcherrun--prompt-command-type))
+                (recursive (when (file-directory-p path)
+                            (watcherrun--prompt-recursion-for-directories (list path)))))
+            
+            ;; Get command string
+            (let ((command (read-string "Enter command to execute: ")))
+              
+              ;; Create the watcher
+              (let ((watcher-id (watcherrun-add-watcher (list path) command command-type recursive)))
+                (message "Added watcher %s for %s" watcher-id path)))))
+      
+      (error
+       (message "Error: %s" (error-message-string error))))))
 
 ;;;###autoload
 (defun watcherrun-delete-watcher-menu ()

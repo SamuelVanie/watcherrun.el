@@ -204,5 +204,123 @@
   (should (eq (lookup-key dired-mode-map (kbd "W")) 
               'watcherrun-dired-add-watcher)))
 
+;; Test interactive watcher creation
+
+(ert-deftest watcherrun-test-add-watcher-interactive-file ()
+  "Test interactive watcher creation for a file."
+  (let ((temp-dir (watcherrun-test-setup-temp-files)))
+    (unwind-protect
+        (let ((test-file (expand-file-name "test1.txt" temp-dir))
+              created-watcher-id)
+          ;; Mock user inputs
+          (cl-letf (((symbol-function 'read-file-name)
+                     (lambda (prompt &optional dir default-filename mustmatch initial predicate)
+                       test-file))
+                    ((symbol-function 'read-char-choice)
+                     (lambda (prompt choices) ?s))
+                    ((symbol-function 'read-string)
+                     (lambda (prompt &optional initial-input history default-value inherit-input-method)
+                       "echo 'test'"))
+                    ((symbol-function 'message)
+                     (lambda (format-string &rest args)
+                       (let ((msg (apply #'format format-string args)))
+                         (when (string-match "Added watcher \\([^ ]+\\)" msg)
+                           (setq created-watcher-id (match-string 1 msg)))))))
+            
+            ;; Call the function
+            (watcherrun-add-watcher-interactive)
+            
+            ;; Verify watcher was created
+            (should created-watcher-id)
+            
+            ;; Clean up
+            (when created-watcher-id
+              (watcherrun-remove-watcher created-watcher-id))))
+      (watcherrun-test-cleanup-temp-dir temp-dir))))
+
+(ert-deftest watcherrun-test-add-watcher-interactive-directory ()
+  "Test interactive watcher creation for a directory."
+  (let ((temp-dir (watcherrun-test-setup-temp-files)))
+    (unwind-protect
+        (let ((created-watcher-id))
+          ;; Mock user inputs
+          (cl-letf (((symbol-function 'read-file-name)
+                     (lambda (prompt &optional dir default-filename mustmatch initial predicate)
+                       temp-dir))
+                    ((symbol-function 'read-char-choice)
+                     (lambda (prompt choices)
+                       (cond
+                        ((string-match-p "ystem.*isp" prompt) ?l)
+                        ((string-match-p "mmediately.*ecursively" prompt) ?r)
+                        (t (error "Unexpected prompt: %s" prompt)))))
+                    ((symbol-function 'read-string)
+                     (lambda (prompt &optional initial-input history default-value inherit-input-method)
+                       "(message \"Directory changed\")"))
+                    ((symbol-function 'message)
+                     (lambda (format-string &rest args)
+                       (let ((msg (apply #'format format-string args)))
+                         (when (string-match "Added watcher \\([^ ]+\\)" msg)
+                           (setq created-watcher-id (match-string 1 msg)))))))
+            
+            ;; Call the function
+            (watcherrun-add-watcher-interactive)
+            
+            ;; Verify watcher was created
+            (should created-watcher-id)
+            
+            ;; Clean up
+            (when created-watcher-id
+              (watcherrun-remove-watcher created-watcher-id))))
+      (watcherrun-test-cleanup-temp-dir temp-dir))))
+
+(ert-deftest watcherrun-test-add-watcher-interactive-invalid-path ()
+  "Test interactive watcher creation with invalid path."
+  (let ((invalid-path "/nonexistent/path/file.txt")
+        (error-message-captured nil))
+    ;; Mock user inputs
+    (cl-letf (((symbol-function 'read-file-name)
+               (lambda (prompt &optional dir default-filename mustmatch initial predicate)
+                 invalid-path))
+              ((symbol-function 'message)
+               (lambda (format-string &rest args)
+                 (setq error-message-captured (apply #'format format-string args)))))
+      
+      ;; Call the function
+      (watcherrun-add-watcher-interactive)
+      
+      ;; Verify error message was shown
+      (should error-message-captured)
+      (should (string-match-p "Error:" error-message-captured)))))
+
+(ert-deftest watcherrun-test-add-watcher-interactive-file-completion ()
+  "Test that read-file-name provides path completion."
+  (let ((temp-dir (watcherrun-test-setup-temp-files))
+        (read-file-name-called nil))
+    (unwind-protect
+        (progn
+          ;; Mock read-file-name to verify it's called with correct parameters
+          (cl-letf (((symbol-function 'read-file-name)
+                     (lambda (prompt &optional dir default-filename mustmatch initial predicate)
+                       (setq read-file-name-called t)
+                       ;; Verify prompt and mustmatch parameter
+                       (should (string-match-p "Watch file or directory" prompt))
+                       (should (eq mustmatch t))
+                       ;; Return a valid path to continue test
+                       (expand-file-name "test1.txt" temp-dir)))
+                    ((symbol-function 'read-char-choice)
+                     (lambda (prompt choices) ?s))
+                    ((symbol-function 'read-string)
+                     (lambda (prompt &optional initial-input history default-value inherit-input-method)
+                       "echo 'test'"))
+                    ((symbol-function 'message)
+                     (lambda (format-string &rest args) nil)))
+            
+            ;; Call the function
+            (watcherrun-add-watcher-interactive)
+            
+            ;; Verify read-file-name was called
+            (should read-file-name-called)))
+      (watcherrun-test-cleanup-temp-dir temp-dir))))
+
 (provide 'test-ui)
 ;;; test-ui.el ends here
