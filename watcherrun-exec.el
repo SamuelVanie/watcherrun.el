@@ -41,6 +41,21 @@
   :type '(repeat string)
   :group 'watcherrun-exec)
 
+(defcustom watcherrun-lisp-evaluation-timeout 5.0
+  "Timeout in seconds for Lisp expression evaluation."
+  :type 'number
+  :group 'watcherrun-exec)
+
+;; Security: Forbidden functions for Lisp evaluation
+(defvar watcherrun-forbidden-functions
+  '(delete-file delete-directory shell-command
+    kill-emacs save-buffers-kill-emacs
+    eval-expression shell-command-to-string
+    start-process call-process
+    make-process async-shell-command
+    dired-delete-file)
+  "Functions that are not allowed in watcher expressions for security.")
+
 ;; Forward declarations
 (declare-function watcherrun-log-debug "watcherrun-support")
 (declare-function watcherrun-log-info "watcherrun-support")
@@ -290,6 +305,89 @@ PROCESS is the process generating the output."
                (kill-process process)))
            watcherrun--active-processes)
   (clrhash watcherrun--active-processes))
+
+;; Lisp Expression Evaluator
+
+(defun watcherrun-validate-lisp-expression (expression)
+  "Validate that EXPRESSION is safe to evaluate.
+Returns t if safe, nil if contains forbidden functions."
+  (cond
+   ;; Handle atoms (symbols, numbers, strings)
+   ((atom expression)
+    (if (symbolp expression)
+        (not (memq expression watcherrun-forbidden-functions))
+      t))  ; Numbers, strings are safe
+   
+   ;; Handle lists recursively
+   ((listp expression)
+    (and
+     ;; Check if the function (car) is allowed
+     (if (symbolp (car expression))
+         (not (memq (car expression) watcherrun-forbidden-functions))
+       t)
+     ;; Recursively check all arguments
+     (cl-every #'watcherrun-validate-lisp-expression (cdr expression))))
+   
+   ;; Default to safe for unknown types
+   (t t)))
+
+(defun watcherrun-evaluate-lisp-expression (expression file-path watcher-id)
+  "Safely evaluate Lisp EXPRESSION with file context.
+FILE-PATH provides the file context as file-var.
+WATCHER-ID provides watcher context as watcher-id-var.
+Returns evaluation result or nil on error."
+  (condition-case error
+      ;; Use with-timeout to prevent infinite loops
+      (with-timeout (watcherrun-lisp-evaluation-timeout
+                    (progn
+                      (watcherrun-log-warning "Lisp evaluation timeout for watcher %s" watcher-id)
+                      nil))
+        
+        ;; Parse the expression first
+        (let ((parsed-expr (condition-case parse-error
+                              (read expression)
+                            (error
+                             (watcherrun-report-error
+                              (format "Lisp parse error for watcher %s: %s"
+                                     watcher-id (error-message-string parse-error)))
+                             nil))))
+          
+          (when parsed-expr
+            ;; Validate the parsed expression
+            (if (watcherrun-validate-lisp-expression parsed-expr)
+                ;; Evaluate the expression with context variables
+                (let ((result (eval `(let ((file-var ,file-path)
+                                          (watcher-id-var ,watcher-id)
+                                          (change-time ',(current-time))
+                                          (buffer-context ',(current-buffer)))
+                                       ,parsed-expr))))
+                  (watcherrun-log-info "Lisp evaluation completed for watcher %s" watcher-id)
+                  result)
+              
+              ;; Expression failed validation
+              (progn
+                (watcherrun-report-error
+                 (format "Lisp expression contains forbidden functions for watcher %s: %s"
+                        watcher-id expression))
+                nil)))))
+    
+    ;; Handle evaluation errors
+    (error
+     (watcherrun-report-error
+      (format "Lisp evaluation error for watcher %s: %s"
+             watcher-id (error-message-string error)))
+     nil)))
+
+(defun watcherrun-test-lisp-expression (expression)
+  "Test a Lisp EXPRESSION for safety without evaluation.
+Returns list (VALID-P . MESSAGE) where VALID-P is t/nil and MESSAGE explains result."
+  (condition-case error
+      (let ((parsed-expr (read expression)))
+        (if (watcherrun-validate-lisp-expression parsed-expr)
+            (cons t "Expression is safe to evaluate")
+          (cons nil "Expression contains forbidden functions")))
+    (error
+     (cons nil (format "Parse error: %s" (error-message-string error))))))
 
 (provide 'watcherrun-exec)
 
