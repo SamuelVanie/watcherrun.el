@@ -38,6 +38,9 @@
 
 ;;; Code:
 
+(require 'easymenu)
+(require 'watcherrun-support)
+(require 'watcherrun-core)
 (require 'watcherrun-ui)
 
 (defgroup watcherrun nil
@@ -51,6 +54,31 @@
   "If non-nil, show notifications when errors occur."
   :type 'boolean
   :group 'watcherrun)
+
+;;; Package activation/deactivation
+
+;;;###autoload
+(define-minor-mode watcherrun-mode
+  "Minor mode for WatcherRun file watching functionality."
+  :global t
+  :lighter " WatcherRun"
+  :keymap watcherrun-mode-map
+  (if watcherrun-mode
+      (watcherrun--enable)
+    (watcherrun--disable)))
+
+(defun watcherrun--enable ()
+  "Enable WatcherRun functionality."
+  (watcherrun-initialize-session)
+  (easy-menu-add-item global-map '(menu-bar tools) watcherrun-menu)
+  (watcherrun-setup-dired-integration)
+  (message "WatcherRun enabled"))
+
+(defun watcherrun--disable ()
+  "Disable WatcherRun and clean up resources."
+  (watcherrun-cleanup-session)
+  (easy-menu-remove-item global-map '(menu-bar tools) "WatcherRun")
+  (message "WatcherRun disabled"))
 
 (provide 'watcherrun)
 ;;; watcherrun.el ends here

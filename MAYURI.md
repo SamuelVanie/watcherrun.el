@@ -120,6 +120,9 @@ Key starting points to read first:
 - ✅ Process management and async execution implemented
 - ✅ Compilation buffer auto-renaming working
 - ✅ Process cleanup and resource management
+- ✅ Package activation/deactivation with `watcherrun-mode`
+- ✅ Integration tests with 6 passing tests
+- ✅ All components properly connected and working together
 
 # Important Notes & Tips
 - File-notify backends vary by OS. Some events differ or are noisy; event filtering/debouncing helps.
