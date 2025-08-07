@@ -127,10 +127,18 @@ Uses completing-read to select from active watchers."
 Shows all logged errors, warnings, and debug information.
 The error buffer includes timestamps and actionable error details."
   (interactive)
-  (let ((error-buffer (get-buffer "*WatcherRun Errors*")))
-    (if error-buffer
-        (display-buffer error-buffer)
-      (message "No error buffer found"))))
+  (let ((error-buffer (get-buffer-create "*WatcherRun Errors*")))
+    (with-current-buffer error-buffer
+      ;; Ensure error mode is enabled
+      (unless (eq major-mode 'watcherrun-error-mode)
+        (watcherrun-error-mode))
+      ;; Add header if buffer is empty
+      (when (= (buffer-size) 0)
+        (let ((inhibit-read-only t))
+          (insert "=== WatcherRun Error Log ===\n\n")
+          (insert "No errors logged yet.\n\n")
+          (insert "Errors will appear here when watchers encounter issues.\n"))))
+    (display-buffer error-buffer)))
 
 ;;; Menu definition
 
