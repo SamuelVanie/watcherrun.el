@@ -198,4 +198,87 @@ Returns a list of descriptors for all created watchers."
         (watcherrun-log-info "Restarted watcher for paths: %S" paths)))))
 
 (provide 'watcherrun-core)
+;; Command type detection
+(defun watcherrun-determine-command-type (command)
+  "Intelligently determine if COMMAND is system or lisp."
+  (pcase command
+    ((pred (lambda (cmd) (string-match-p "^(" cmd))) 'lisp)
+    ((pred (lambda (cmd) (string-match-p "compile\\|make\\|npm" cmd))) 'system)
+    (_ 'system)))
+
+;; Command validation functions
+(defun watcherrun-validate-system-command (command)
+  "Validate COMMAND as a system command."
+  (let* ((parsed (watcherrun-parse-command command))
+         (executable (plist-get parsed :executable)))
+    (unless (or (executable-find executable)
+                (member executable '("echo" "cd" "pwd")))
+      (warn "Executable '%s' not found in PATH" executable))
+    t))
+
+(defun watcherrun-validate-lisp-command (command)
+  "Validate COMMAND as a Lisp expression."
+  (condition-case err
+      (progn
+        ;; Try to read the expression
+        (read-from-string command)
+        ;; Check for dangerous functions
+        (when (string-match-p "delete-file\\|delete-directory\\|shell-command" command)
+          (warn "Potentially dangerous Lisp command: %s" command))
+        t)
+    (error
+     (error "Invalid Lisp syntax in command: %s" (error-message-string err)))))
+
+(defun watcherrun-validate-command (command command-type)
+  "Validate COMMAND based on COMMAND-TYPE."
+  (pcase command-type
+    ('system (watcherrun-validate-system-command command))
+    ('lisp (watcherrun-validate-lisp-command command))
+    (_ (error "Unknown command type: %s" command-type))))
+
+;; Main command executor
+(defun watcherrun-execute-command (watcher file-path)
+  "Execute command for WATCHER with FILE-PATH context."
+  (when (and watcher file-path)
+    (let* ((command (watcherrun-watcher-command watcher))
+           (command-type (watcherrun-watcher-command-type watcher))
+           (expanded-command (watcherrun-expand-placeholders command file-path)))
+      
+      ;; Update execution statistics
+      (setf (watcherrun-watcher-last-executed watcher) (current-time))
+      (setf (watcherrun-watcher-execution-count watcher)
+            (1+ (or (watcherrun-watcher-execution-count watcher) 0)))
+      
+      ;; Validate and execute command
+      (condition-case err
+          (progn
+            (watcherrun-validate-command expanded-command command-type)
+            (pcase command-type
+              ('system (watcherrun--execute-system-command expanded-command watcher))
+              ('lisp (watcherrun--execute-lisp-command expanded-command watcher))
+              (_ (error "Invalid command type: %s" command-type)))
+            (setf (watcherrun-watcher-status watcher) 'active))
+        (error
+         (watcherrun-report-error
+          (format "Command execution failed for watcher %s: %s"
+                  (watcherrun-watcher-id watcher)
+                  (error-message-string err)))
+         (setf (watcherrun-watcher-status watcher) 'error))))))
+
+;; System command execution
+(defun watcherrun--execute-system-command (command watcher)
+  "Execute system COMMAND for WATCHER."
+  (let ((buffer-name (format "*WatcherRun-%s*" (watcherrun-watcher-id watcher))))
+    (watcherrun-log-info "Executing system command: %s" command)
+    (async-shell-command command buffer-name)))
+
+;; Lisp command execution
+(defun watcherrun--execute-lisp-command (command watcher)
+  "Execute Lisp COMMAND for WATCHER."
+  (watcherrun-log-info "Executing Lisp command: %s" command)
+  (condition-case err
+      (eval (read-from-string command) t)
+    (error
+     (error "Lisp execution error: %s" (error-message-string err)))))
+
 ;;; watcherrun-core.el ends here

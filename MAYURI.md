@@ -51,6 +51,16 @@ When implementing new features, follow these testing guidelines:
 - Execution Layer: System command runner, Lisp expression evaluator, compilation buffer manager.
 - Support Components: Error handling, session storage (in-memory), utilities.
 
+## Command Executor Functions (CORE-002)
+The following functions are implemented in watcherrun-core.el:
+- `watcherrun-determine-command-type`: Intelligently detects if command is system or lisp
+- `watcherrun-validate-command`: Validates commands based on type
+- `watcherrun-execute-command`: Main dispatcher that handles execution with statistics tracking
+- `watcherrun--execute-system-command`: Executes system commands in dedicated buffers
+- `watcherrun--execute-lisp-command`: Safely executes Lisp expressions
+
+Testing framework: All functions have comprehensive tests in test/test-core-executor.el
+
 See .mayuri/ for design details:
 - architecture_overview.md
 - component_core_engine.md
