@@ -36,7 +36,6 @@ Create the system command runner that executes system commands asynchronously us
 intermediate
 
 ## Best Practices / Notes
-- Use `start-process` for true asynchronous execution - never `shell-command`
 - Create dedicated output buffers for each watcher to avoid conflicts
 - Implement process sentinels to handle completion and errors properly
 - Use `process-live-p` to check process status before operations
@@ -70,7 +69,6 @@ intermediate
 - Clean up resources as needed
 
 **Output Buffer Features:**
-- Automatic scrolling to show latest output
 - Timestamps for each execution
 - Color coding for different types of output
 - Option to clear buffer on new execution

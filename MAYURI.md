@@ -114,7 +114,12 @@ Key starting points to read first:
 - ✅ Menu bar interface with keyboard shortcuts (C-c w [l|a|d|m|e])
 - ✅ All menu commands with proper error handling and user feedback
 - ✅ Dynamic menu state management based on watcher count
-- ✅ Full test coverage with 9 passing tests
+- ✅ Support components with 6 passing tests
+- ✅ Utility functions with 7 passing tests
+- ✅ System command execution layer with 9 passing tests
+- ✅ Process management and async execution implemented
+- ✅ Compilation buffer auto-renaming working
+- ✅ Process cleanup and resource management
 
 # Important Notes & Tips
 - File-notify backends vary by OS. Some events differ or are noisy; event filtering/debouncing helps.
